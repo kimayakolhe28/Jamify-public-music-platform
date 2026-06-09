@@ -4,12 +4,17 @@ const express = require('express')
 const mongoose = require('mongoose')
 const cors = require('cors')
 
+const authRoutes = require('./routes/auth')
+const jamRoutes = require('./routes/jams')
+
 const app = express()
 
 app.use(cors())
 app.use(express.json())
 
-// Test route
+app.use('/api/auth', authRoutes)
+app.use('/api/jams', jamRoutes)
+
 app.get('/', (req, res) => {
   res.json({ message: 'Jamify backend is running 🎵' })
 })
