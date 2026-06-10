@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'react-router-dom'
 import { io } from 'socket.io-client'
+import axios from 'axios'
 
 const socket = io('http://localhost:5000')
 
@@ -8,26 +9,39 @@ function JamRoom() {
   const { id } = useParams()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
-  const [joined, setJoined] = useState(false)
+  const [jam, setJam] = useState(null)
+  const [onlineUsers, setOnlineUsers] = useState(1)
   const messagesEndRef = useRef(null)
 
   const user = JSON.parse(localStorage.getItem('user') || '{"name":"Guest"}')
 
   useEffect(() => {
+    axios.get(`http://localhost:5000/api/jams/${id}`)
+      .then(res => setJam(res.data))
+      .catch((err) => {
+        console.error('JAM FETCH ERROR:', err.message)
+        setJam({ title: 'Jam Room' })
+      })
+
     socket.emit('join_room', { roomId: id, username: user.name })
-    setJoined(true)
 
     socket.on('user_joined', (data) => {
       setMessages(prev => [...prev, { type: 'system', message: data.message }])
+      setOnlineUsers(prev => prev + 1)
     })
 
     socket.on('receive_message', (data) => {
       setMessages(prev => [...prev, { type: 'chat', ...data }])
     })
 
+    socket.on('user_left', (data) => {
+      setOnlineUsers(prev => Math.max(1, prev - 1))
+    })
+
     return () => {
       socket.off('user_joined')
       socket.off('receive_message')
+      socket.off('user_left')
     }
   }, [id])
 
@@ -51,9 +65,16 @@ function JamRoom() {
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      <div className="p-6 border-b border-gray-800">
-        <h2 className="text-2xl font-bold">🎵 Jam Room</h2>
-        <p className="text-gray-400 text-sm mt-1">Room ID: {id}</p>
+      <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold">🎵 {jam ? jam.title : 'Loading...'}</h2>
+          <p className="text-gray-400 text-sm mt-1">
+            {jam ? `Genre: ${jam.genre}` : ''}
+          </p>
+        </div>
+        <div className="bg-gray-800 px-4 py-2 rounded-full">
+          <span className="text-green-400 font-semibold">🎧 {onlineUsers} listening</span>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-3">

@@ -14,6 +14,18 @@ router.get('/', async (req, res) => {
   }
 })
 
+// Get single jam by ID
+router.get('/:id', async (req, res) => {
+  try {
+    const jam = await Jam.findById(req.params.id).populate('host', 'name')
+    if (!jam) return res.status(404).json({ message: 'Jam not found' })
+    res.json(jam)
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ message: 'Server error' })
+  }
+})
+
 // Create a new jam (protected)
 router.post('/create', protect, async (req, res) => {
   try {
