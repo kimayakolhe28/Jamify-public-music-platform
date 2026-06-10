@@ -29,20 +29,25 @@ app.get('/', (req, res) => {
   res.json({ message: 'Jamify backend is running 🎵' })
 })
 
-// Socket.IO logic
+const roomUsers = {}
+
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id)
 
-  // Join a jam room
   socket.on('join_room', (data) => {
     socket.join(data.roomId)
-    console.log(`User ${data.username} joined room ${data.roomId}`)
-    io.to(data.roomId).emit('user_joined', {
+    socket.username = data.username
+    socket.roomId = data.roomId
+
+    if (!roomUsers[data.roomId]) roomUsers[data.roomId] = new Set()
+    roomUsers[data.roomId].add(socket.id)
+
+    io.to(data.roomId).emit('room_users', {
+      count: roomUsers[data.roomId].size,
       message: `${data.username} joined the jam 🎵`
     })
   })
 
-  // Send a message
   socket.on('send_message', (data) => {
     io.to(data.roomId).emit('receive_message', {
       username: data.username,
@@ -51,8 +56,14 @@ io.on('connection', (socket) => {
     })
   })
 
-  // Leave room
   socket.on('disconnect', () => {
+    if (socket.roomId && roomUsers[socket.roomId]) {
+      roomUsers[socket.roomId].delete(socket.id)
+      io.to(socket.roomId).emit('room_users', {
+        count: roomUsers[socket.roomId].size,
+        message: `${socket.username} left the jam`
+      })
+    }
     console.log('User disconnected:', socket.id)
   })
 })

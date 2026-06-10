@@ -10,7 +10,7 @@ function JamRoom() {
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [jam, setJam] = useState(null)
-  const [onlineUsers, setOnlineUsers] = useState(1)
+  const [onlineUsers, setOnlineUsers] = useState(0)
   const messagesEndRef = useRef(null)
 
   const user = JSON.parse(localStorage.getItem('user') || '{"name":"Guest"}')
@@ -25,23 +25,20 @@ function JamRoom() {
 
     socket.emit('join_room', { roomId: id, username: user.name })
 
-    socket.on('user_joined', (data) => {
-      setMessages(prev => [...prev, { type: 'system', message: data.message }])
-      setOnlineUsers(prev => prev + 1)
+    socket.on('room_users', (data) => {
+      setOnlineUsers(data.count)
+      if (data.message) {
+        setMessages(prev => [...prev, { type: 'system', message: data.message }])
+      }
     })
 
     socket.on('receive_message', (data) => {
       setMessages(prev => [...prev, { type: 'chat', ...data }])
     })
 
-    socket.on('user_left', (data) => {
-      setOnlineUsers(prev => Math.max(1, prev - 1))
-    })
-
     return () => {
-      socket.off('user_joined')
+      socket.off('room_users')
       socket.off('receive_message')
-      socket.off('user_left')
     }
   }, [id])
 
