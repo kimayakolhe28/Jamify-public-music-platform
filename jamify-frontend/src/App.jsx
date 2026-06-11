@@ -7,6 +7,7 @@ import CreateJam from './pages/CreateJam'
 import JamRoom from './pages/JamRoom'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import SpotifyCallback from './pages/SpotifyCallback'
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
         <Route path="/browse" element={<BrowseJams />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/spotify-callback" element={<SpotifyCallback />} />
         <Route path="/create" element={
           <ProtectedRoute>
             <CreateJam />

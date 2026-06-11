@@ -8,6 +8,7 @@ const { Server } = require('socket.io')
 
 const authRoutes = require('./routes/auth')
 const jamRoutes = require('./routes/jams')
+const spotifyRoutes = require('./routes/spotify')
 
 const app = express()
 const server = http.createServer(app)
@@ -24,6 +25,7 @@ app.use(express.json())
 
 app.use('/api/auth', authRoutes)
 app.use('/api/jams', jamRoutes)
+app.use('/api/auth/spotify', spotifyRoutes)
 
 app.get('/', (req, res) => {
   res.json({ message: 'Jamify backend is running 🎵' })

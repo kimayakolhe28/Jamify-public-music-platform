@@ -13,6 +13,22 @@ const UserSchema = new mongoose.Schema({
   password: {
     type: String,
     required: true
+  },
+  spotifyId: {
+    type: String,
+    default: ''
+  },
+  spotifyAccessToken: {
+    type: String,
+    default: ''
+  },
+  spotifyRefreshToken: {
+    type: String,
+    default: ''
+  },
+  profilePic: {
+    type: String,
+    default: ''
   }
 }, { timestamps: true })
 
