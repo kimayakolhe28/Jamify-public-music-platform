@@ -9,6 +9,7 @@ const { Server } = require('socket.io')
 const authRoutes = require('./routes/auth')
 const jamRoutes = require('./routes/jams')
 const spotifyRoutes = require('./routes/spotify')
+const musicRoutes = require('./routes/music')
 
 const app = express()
 const server = http.createServer(app)
@@ -26,6 +27,7 @@ app.use(express.json())
 app.use('/api/auth', authRoutes)
 app.use('/api/jams', jamRoutes)
 app.use('/api/auth/spotify', spotifyRoutes)
+app.use('/api/music', musicRoutes)
 
 app.get('/', (req, res) => {
   res.json({ message: 'Jamify backend is running 🎵' })
@@ -56,6 +58,23 @@ io.on('connection', (socket) => {
       message: data.message,
       time: new Date().toLocaleTimeString()
     })
+  })
+
+  socket.on('play_song', (data) => {
+    io.to(data.roomId).emit('song_changed', {
+      videoId: data.videoId,
+      title: data.title,
+      artist: data.artist,
+      thumbnail: data.thumbnail
+    })
+  })
+
+  socket.on('pause_song', (data) => {
+    io.to(data.roomId).emit('song_paused')
+  })
+
+  socket.on('resume_song', (data) => {
+    io.to(data.roomId).emit('song_resumed')
   })
 
   socket.on('disconnect', () => {
