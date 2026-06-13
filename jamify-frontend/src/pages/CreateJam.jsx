@@ -2,6 +2,24 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createJam } from '../services/api'
 
+const GENRES = [
+  'Bollywood',
+  'Pop',
+  'Lo-fi',
+  'Hip-hop',
+  'Rock',
+  'Jazz',
+  'Classical',
+  'EDM',
+  'R&B',
+  'Indie',
+  'Metal',
+  'Country',
+  'Punjabi',
+  'Tamil',
+  'Telugu'
+]
+
 function CreateJam() {
   const [form, setForm] = useState({ title: '', genre: '' })
   const [error, setError] = useState('')
@@ -47,14 +65,17 @@ function CreateJam() {
           onChange={handleChange}
           className="bg-gray-700 text-white placeholder-gray-400 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
         />
-        <input
+        <select
           name="genre"
-          type="text"
-          placeholder="Genre (e.g. Pop, Lo-fi)"
           value={form.genre}
           onChange={handleChange}
-          className="bg-gray-700 text-white placeholder-gray-400 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500"
-        />
+          className="bg-gray-700 text-white rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-green-500 cursor-pointer"
+        >
+          <option value="" disabled>Select a genre</option>
+          {GENRES.map(genre => (
+            <option key={genre} value={genre}>{genre}</option>
+          ))}
+        </select>
         <button
           onClick={handleSubmit}
           disabled={loading}

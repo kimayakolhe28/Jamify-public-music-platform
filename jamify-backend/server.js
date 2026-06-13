@@ -34,6 +34,7 @@ app.get('/', (req, res) => {
 })
 
 const roomUsers = {}
+const roomSongs = {}
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id)
@@ -44,12 +45,17 @@ io.on('connection', (socket) => {
     socket.roomId = data.roomId
 
     if (!roomUsers[data.roomId]) roomUsers[data.roomId] = new Set()
+    const isNewUser = !roomUsers[data.roomId].has(socket.id)
     roomUsers[data.roomId].add(socket.id)
 
     io.to(data.roomId).emit('room_users', {
       count: roomUsers[data.roomId].size,
-      message: `${data.username} joined the jam 🎵`
+      message: isNewUser ? `${data.username} joined the jam 🎵` : null
     })
+
+    if (roomSongs[data.roomId]) {
+      socket.emit('song_changed', roomSongs[data.roomId])
+    }
   })
 
   socket.on('send_message', (data) => {
@@ -61,12 +67,13 @@ io.on('connection', (socket) => {
   })
 
   socket.on('play_song', (data) => {
-    io.to(data.roomId).emit('song_changed', {
+    roomSongs[data.roomId] = {
       videoId: data.videoId,
       title: data.title,
       artist: data.artist,
       thumbnail: data.thumbnail
-    })
+    }
+    io.to(data.roomId).emit('song_changed', roomSongs[data.roomId])
   })
 
   socket.on('pause_song', (data) => {

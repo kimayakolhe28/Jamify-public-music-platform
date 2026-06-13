@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import axios from 'axios'
 
@@ -7,6 +7,7 @@ const socket = io('http://localhost:5000')
 
 function JamRoom() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const [messages, setMessages] = useState([])
   const [input, setInput] = useState('')
   const [jam, setJam] = useState(null)
@@ -20,9 +21,6 @@ function JamRoom() {
   const playerRef = useRef(null)
 
   const user = JSON.parse(localStorage.getItem('user') || '{"name":"Guest"}')
-
-  // Check if current user is the host
-  const isHost = jam?.host?._id === user.id || jam?.host === user.id
 
   useEffect(() => {
     axios.get(`http://localhost:5000/api/jams/${id}`)
@@ -45,16 +43,25 @@ function JamRoom() {
     socket.on('song_changed', (data) => {
       setCurrentSong(data)
       setIsPlaying(true)
-      setMessages(prev => [...prev, {
-        type: 'system',
-        message: `🎵 Now playing: ${data.title}`
-      }])
+      setMessages(prev => {
+        const lastMsg = prev[prev.length - 1]
+        if (lastMsg?.message === `🎵 Now playing: ${data.title}`) return prev
+        return [...prev, { type: 'system', message: `🎵 Now playing: ${data.title}` }]
+      })
     })
 
     socket.on('song_paused', () => setIsPlaying(false))
     socket.on('song_resumed', () => setIsPlaying(true))
 
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.search-container')) {
+        setSearchResults([])
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+
     return () => {
+      document.removeEventListener('click', handleClickOutside)
       socket.off('room_users')
       socket.off('receive_message')
       socket.off('song_changed')
@@ -100,20 +107,33 @@ function JamRoom() {
     if (e.key === 'Enter') sendMessage()
   }
 
+  const handleLeave = () => {
+    navigate('/browse')
+  }
+
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
-      {/* Header */}
       <div className="p-4 border-b border-gray-800 flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold">🎵 {jam ? jam.title : 'Loading...'}</h2>
-          <p className="text-gray-400 text-sm">{jam ? `Genre: ${jam.genre}` : ''}</p>
+          <p className="text-gray-400 text-sm">
+            {jam ? `Genre: ${jam.genre}` : ''}
+            {jam?.host?.name ? ` · Host: ${jam.host.name}` : ''}
+          </p>
         </div>
-        <div className="bg-gray-800 px-4 py-2 rounded-full">
-          <span className="text-green-400 font-semibold">🎧 {onlineUsers} listening</span>
+        <div className="flex items-center gap-3">
+          <div className="bg-gray-800 px-4 py-2 rounded-full">
+            <span className="text-green-400 font-semibold">🎧 {onlineUsers} listening</span>
+          </div>
+          <button
+            onClick={handleLeave}
+            className="bg-red-500 hover:bg-red-400 text-white text-sm font-semibold px-4 py-2 rounded-full"
+          >
+            Leave
+          </button>
         </div>
       </div>
 
-      {/* Music Player */}
       <div className="border-b border-gray-800 p-4">
         {currentSong ? (
           <div className="flex items-center gap-4 mb-3">
@@ -130,11 +150,11 @@ function JamRoom() {
           <p className="text-gray-500 text-sm mb-3">No song playing — search and select a song</p>
         )}
 
-        {/* YouTube Player */}
         {currentSong && (
           <div className="mb-3">
             <iframe
               ref={playerRef}
+              key={currentSong.videoId}
               width="100%"
               height="200"
               src={`https://www.youtube.com/embed/${currentSong.videoId}?autoplay=1&enablejsapi=1`}
@@ -145,47 +165,46 @@ function JamRoom() {
           </div>
         )}
 
-        {/* Search */}
-        <div className="flex gap-2 mb-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && searchSongs()}
-            placeholder="🔍 Search songs..."
-            className="flex-1 bg-gray-800 text-white placeholder-gray-500 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-green-500"
-          />
-          <button
-            onClick={searchSongs}
-            disabled={searching}
-            className="bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-xl text-sm disabled:opacity-50"
-          >
-            {searching ? '...' : 'Search'}
-          </button>
-        </div>
-
-        {/* Search Results */}
-        {searchResults.length > 0 && (
-          <div className="bg-gray-800 rounded-xl overflow-hidden">
-            {searchResults.map((song) => (
-              <div
-                key={song.videoId}
-                onClick={() => playSong(song)}
-                className="flex items-center gap-3 p-3 hover:bg-gray-700 cursor-pointer border-b border-gray-700 last:border-0"
-              >
-                <img src={song.thumbnail} alt={song.title} className="w-12 h-12 rounded object-cover" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{song.title}</p>
-                  <p className="text-xs text-gray-400 truncate">{song.artist}</p>
-                </div>
-                <span className="text-green-400 text-xs">▶ Play</span>
-              </div>
-            ))}
+        <div className="search-container">
+          <div className="flex gap-2 mb-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && searchSongs()}
+              placeholder="🔍 Search songs..."
+              className="flex-1 bg-gray-800 text-white placeholder-gray-500 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              onClick={searchSongs}
+              disabled={searching}
+              className="bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-xl text-sm disabled:opacity-50"
+            >
+              {searching ? '...' : 'Search'}
+            </button>
           </div>
-        )}
+
+          {searchResults.length > 0 && (
+            <div className="bg-gray-800 rounded-xl overflow-hidden">
+              {searchResults.map((song) => (
+                <div
+                  key={song.videoId}
+                  onClick={() => playSong(song)}
+                  className="flex items-center gap-3 p-3 hover:bg-gray-700 cursor-pointer border-b border-gray-700 last:border-0"
+                >
+                  <img src={song.thumbnail} alt={song.title} className="w-12 h-12 rounded object-cover" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{song.title}</p>
+                    <p className="text-xs text-gray-400 truncate">{song.artist}</p>
+                  </div>
+                  <span className="text-green-400 text-xs">▶ Play</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Chat */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
         {messages.length === 0 && (
           <p className="text-gray-500 text-center mt-8">You joined the jam! Say hello 👋</p>
@@ -205,7 +224,6 @@ function JamRoom() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Message Input */}
       <div className="p-4 border-t border-gray-800 flex gap-3">
         <input
           type="text"
