@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import axios from 'axios'
+import { endJam } from '../services/api'
 
 const socket = io('http://localhost:5000')
 
@@ -24,7 +25,12 @@ function JamRoom() {
 
   useEffect(() => {
     axios.get(`http://localhost:5000/api/jams/${id}`)
-      .then(res => setJam(res.data))
+      .then(res => {
+        setJam(res.data)
+        // 🔍 DEBUG — remove after confirming isHost works
+        console.log('Jam host:', res.data.host)
+        console.log('User:', user)
+      })
       .catch(() => setJam({ title: 'Jam Room' }))
 
     socket.emit('join_room', { roomId: id, username: user.name })
@@ -53,6 +59,11 @@ function JamRoom() {
     socket.on('song_paused', () => setIsPlaying(false))
     socket.on('song_resumed', () => setIsPlaying(true))
 
+    socket.on('jam_ended', () => {
+      alert('The host has ended this jam!')
+      navigate('/browse')
+    })
+
     const handleClickOutside = (e) => {
       if (!e.target.closest('.search-container')) {
         setSearchResults([])
@@ -67,6 +78,7 @@ function JamRoom() {
       socket.off('song_changed')
       socket.off('song_paused')
       socket.off('song_resumed')
+      socket.off('jam_ended')
     }
   }, [id])
 
@@ -111,6 +123,23 @@ function JamRoom() {
     navigate('/browse')
   }
 
+  const handleEndJam = async () => {
+    if (!window.confirm('Are you sure you want to end this jam? Everyone will be removed.')) return
+    try {
+      await endJam(id)
+      socket.emit('jam_ended', { roomId: id })
+      navigate('/browse')
+    } catch (err) {
+      console.error(err)
+      alert('Failed to end jam')
+    }
+  }
+
+  // ✅ FIXED: safely compare ObjectId strings in both populated and unpopulated cases
+  const isHost =
+    jam?.host?._id?.toString() === user.id?.toString() ||
+    jam?.host?.toString() === user.id?.toString()
+
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
       <div className="p-4 border-b border-gray-800 flex justify-between items-center">
@@ -125,6 +154,14 @@ function JamRoom() {
           <div className="bg-gray-800 px-4 py-2 rounded-full">
             <span className="text-green-400 font-semibold">🎧 {onlineUsers} listening</span>
           </div>
+          {isHost && (
+            <button
+              onClick={handleEndJam}
+              className="bg-red-700 hover:bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-full"
+            >
+              End Jam
+            </button>
+          )}
           <button
             onClick={handleLeave}
             className="bg-red-500 hover:bg-red-400 text-white text-sm font-semibold px-4 py-2 rounded-full"

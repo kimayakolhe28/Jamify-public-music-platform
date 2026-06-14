@@ -84,6 +84,10 @@ io.on('connection', (socket) => {
     io.to(data.roomId).emit('song_resumed')
   })
 
+  socket.on('jam_ended', (data) => {
+    io.to(data.roomId).emit('jam_ended')
+  })
+
   socket.on('disconnect', () => {
     if (socket.roomId && roomUsers[socket.roomId]) {
       roomUsers[socket.roomId].delete(socket.id)
