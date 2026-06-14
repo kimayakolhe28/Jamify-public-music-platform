@@ -16,6 +16,33 @@ if (!User) {
   console.error('User model could not be loaded. Check models/User.js export.')
 }
 
+// Add Jam model and protect middleware
+const Jam = require('../models/Jam')
+const protect = require('../middleware/authMiddleware')
+
+// GET /api/auth/profile (protected)
+router.get('/profile', protect, async (req, res) => {
+  try {
+    // Find user excluding password
+    const user = await User.findById(req.user.id).select('-password')
+    if (!user) return res.status(404).json({ message: 'User not found' })
+
+    // Find jams hosted by this user, most recent first
+    const jams = await Jam.find({ host: req.user.id }).sort({ createdAt: -1 })
+
+    const stats = {
+      totalJams: jams.length,
+      activeJams: jams.filter(j => j.isActive).length,
+      endedJams: jams.filter(j => !j.isActive).length
+    }
+
+    return res.json({ user, jams, stats })
+  } catch (err) {
+    console.error('Profile error:', err)
+    return res.status(500).json({ message: 'Server error' })
+  }
+})
+
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {

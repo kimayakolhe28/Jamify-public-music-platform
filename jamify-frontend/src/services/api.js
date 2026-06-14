@@ -18,3 +18,7 @@ export const fetchJams = () => API.get('/jams')
 export const createJam = (data) => API.post('/jams/create', data)
 export const joinJam = (id) => API.post(`/jams/join/${id}`)
 export const endJam = (id) => API.post(`/jams/end/${id}`)
+export const getProfile = () => {
+  const token = localStorage.getItem('token')
+  return API.get('/auth/profile', { headers: { Authorization: `Bearer ${token}` } }).then(res => res.data)
+}

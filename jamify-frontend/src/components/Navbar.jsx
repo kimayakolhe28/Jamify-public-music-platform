@@ -20,7 +20,9 @@ function Navbar() {
           {user ? (
             <>
               <Link to="/create" className="hover:text-green-400">Create</Link>
-              <span className="text-gray-400 text-sm">Hi, {user.name}</span>
+              <Link to="/profile" className="hover:text-green-400 text-sm">
+                Hi, {user.name}
+              </Link>
               <button
                 onClick={handleLogout}
                 className="bg-red-500 hover:bg-red-400 text-white text-sm px-4 py-2 rounded-full"

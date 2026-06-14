@@ -8,6 +8,7 @@ import JamRoom from './pages/JamRoom'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import SpotifyCallback from './pages/SpotifyCallback'
+import Profile from './pages/Profile'
 
 function App() {
   return (
@@ -27,6 +28,11 @@ function App() {
         <Route path="/jam/:id" element={
           <ProtectedRoute>
             <JamRoom />
+          </ProtectedRoute>
+        } />
+        <Route path="/profile" element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         } />
       </Routes>
