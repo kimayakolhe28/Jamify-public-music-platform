@@ -28,6 +28,7 @@ app.use('/api/auth', authRoutes)
 app.use('/api/jams', jamRoutes)
 app.use('/api/auth/spotify', spotifyRoutes)
 app.use('/api/music', musicRoutes)
+app.use("/api", require("./routes/recommendations"));
 
 app.get('/', (req, res) => {
   res.json({ message: 'Jamify backend is running 🎵' })
