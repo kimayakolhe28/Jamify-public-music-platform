@@ -18,11 +18,12 @@ def health():
 
 @app.post("/recommend")
 def recommend(song: SongRequest):
-    matched = find_best_match(song.title, song.artist, df)
+    matched, score = find_best_match(song.title, song.artist, df)
     features, genre = get_features(matched)
     recs = get_recommendations(features, genre, df)
     return {
         "matched": matched is not None,
+        "match_score": score,
         "matched_song": matched["track_name"] if matched is not None else None,
         "recommendations": recs
     }

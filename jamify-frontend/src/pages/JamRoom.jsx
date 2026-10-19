@@ -4,7 +4,14 @@ import { io } from 'socket.io-client'
 import axios from 'axios'
 import { endJam } from '../services/api'
 
-const socket = io('http://localhost:5000')
+const socket = io('http://localhost:5000', { autoConnect: false })
+
+// Decode HTML entities from YouTube API titles
+function decodeHtml(str) {
+  const txt = document.createElement('textarea')
+  txt.innerHTML = str
+  return txt.value
+}
 
 function JamRoom() {
   const { id } = useParams()
@@ -18,16 +25,18 @@ function JamRoom() {
   const [searching, setSearching] = useState(false)
   const [currentSong, setCurrentSong] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [recommendations, setRecommendations] = useState([])
   const messagesEndRef = useRef(null)
   const playerRef = useRef(null)
 
   const user = JSON.parse(localStorage.getItem('user') || '{"name":"Guest"}')
 
   useEffect(() => {
+    socket.connect()
+
     axios.get(`http://localhost:5000/api/jams/${id}`)
       .then(res => {
         setJam(res.data)
-        // 🔍 DEBUG — remove after confirming isHost works
         console.log('Jam host:', res.data.host)
         console.log('User:', user)
       })
@@ -49,11 +58,16 @@ function JamRoom() {
     socket.on('song_changed', (data) => {
       setCurrentSong(data)
       setIsPlaying(true)
+      const cleanTitle = decodeHtml(data.title)
       setMessages(prev => {
         const lastMsg = prev[prev.length - 1]
-        if (lastMsg?.message === `🎵 Now playing: ${data.title}`) return prev
-        return [...prev, { type: 'system', message: `🎵 Now playing: ${data.title}` }]
+        if (lastMsg?.message === `🎵 Now playing: ${cleanTitle}`) return prev
+        return [...prev, { type: 'system', message: `🎵 Now playing: ${cleanTitle}` }]
       })
+    })
+
+    socket.on('recommendations_updated', (recs) => {
+      setRecommendations(recs)
     })
 
     socket.on('song_paused', () => setIsPlaying(false))
@@ -76,9 +90,11 @@ function JamRoom() {
       socket.off('room_users')
       socket.off('receive_message')
       socket.off('song_changed')
+      socket.off('recommendations_updated')
       socket.off('song_paused')
       socket.off('song_resumed')
       socket.off('jam_ended')
+      socket.disconnect()
     }
   }, [id])
 
@@ -86,11 +102,12 @@ function JamRoom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  const searchSongs = async () => {
-    if (!searchQuery.trim()) return
+  const searchSongs = async (queryOverride) => {
+    const q = queryOverride || searchQuery
+    if (!q.trim()) return
     setSearching(true)
     try {
-      const res = await axios.get(`http://localhost:5000/api/music/search?query=${searchQuery}`)
+      const res = await axios.get(`http://localhost:5000/api/music/search?query=${encodeURIComponent(q)}`)
       setSearchResults(res.data)
     } catch (err) {
       console.error(err)
@@ -135,13 +152,13 @@ function JamRoom() {
     }
   }
 
-  // ✅ FIXED: safely compare ObjectId strings in both populated and unpopulated cases
   const isHost =
     jam?.host?._id?.toString() === user.id?.toString() ||
     jam?.host?.toString() === user.id?.toString()
 
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col">
+      {/* Header */}
       <div className="p-4 border-b border-gray-800 flex justify-between items-center">
         <div>
           <h2 className="text-xl font-bold">🎵 {jam ? jam.title : 'Loading...'}</h2>
@@ -171,12 +188,13 @@ function JamRoom() {
         </div>
       </div>
 
+      {/* Now Playing + Search */}
       <div className="border-b border-gray-800 p-4">
         {currentSong ? (
           <div className="flex items-center gap-4 mb-3">
-            <img src={currentSong.thumbnail} alt={currentSong.title} className="w-16 h-16 rounded-lg object-cover" />
+            <img src={currentSong.thumbnail} alt={decodeHtml(currentSong.title)} className="w-16 h-16 rounded-lg object-cover" />
             <div className="flex-1">
-              <p className="font-semibold text-sm">{currentSong.title}</p>
+              <p className="font-semibold text-sm">{decodeHtml(currentSong.title)}</p>
               <p className="text-gray-400 text-xs">{currentSong.artist}</p>
             </div>
             <span className={`text-xs px-2 py-1 rounded-full ${isPlaying ? 'bg-green-500 text-black' : 'bg-gray-700'}`}>
@@ -213,7 +231,7 @@ function JamRoom() {
               className="flex-1 bg-gray-800 text-white placeholder-gray-500 rounded-xl px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-green-500"
             />
             <button
-              onClick={searchSongs}
+              onClick={() => searchSongs()}
               disabled={searching}
               className="bg-green-500 hover:bg-green-400 text-black font-semibold px-4 py-2 rounded-xl text-sm disabled:opacity-50"
             >
@@ -231,7 +249,7 @@ function JamRoom() {
                 >
                   <img src={song.thumbnail} alt={song.title} className="w-12 h-12 rounded object-cover" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{song.title}</p>
+                    <p className="text-sm font-medium truncate">{decodeHtml(song.title)}</p>
                     <p className="text-xs text-gray-400 truncate">{song.artist}</p>
                   </div>
                   <span className="text-green-400 text-xs">▶ Play</span>
@@ -242,6 +260,28 @@ function JamRoom() {
         </div>
       </div>
 
+      {/* Recommendations Panel */}
+      {recommendations.length > 0 && (
+        <div className="border-b border-gray-800 p-4">
+          <h3 className="text-sm font-semibold text-gray-400 mb-3">⭐ Recommended Next</h3>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {recommendations.map((rec, i) => (
+              <div
+                key={i}
+                onClick={() => searchSongs(`${rec.track_name} ${rec.artists}`)}
+                className="flex-shrink-0 bg-gray-800 hover:bg-gray-700 rounded-xl p-3 cursor-pointer w-40 transition"
+                title={`${rec.track_name} · ${rec.artists}`}
+              >
+                <p className="text-xs font-semibold truncate">{rec.track_name}</p>
+                <p className="text-xs text-gray-400 truncate mt-1">{rec.artists}</p>
+                <span className="text-xs text-green-400 mt-2 block">{rec.track_genre}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Chat */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
         {messages.length === 0 && (
           <p className="text-gray-500 text-center mt-8">You joined the jam! Say hello 👋</p>
@@ -261,6 +301,7 @@ function JamRoom() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Message Input */}
       <div className="p-4 border-t border-gray-800 flex gap-3">
         <input
           type="text"
